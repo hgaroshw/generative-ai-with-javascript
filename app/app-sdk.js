@@ -1,10 +1,16 @@
+// npm install @github/copilot-sdk tsx
+
+import { CopilotClient } from "@github/copilot-sdk";
+
 import express from 'express';
-import { OpenAI } from 'openai';
 import path from 'path';
 import { fileURLToPath } from 'url'; 
 import dotenv from 'dotenv';
 
 import json from './public/characters.json' with { type: "json" };
+
+const client = new CopilotClient();
+
 
 let systemMessage = json[4].description;
 let page = json[4].page;
@@ -36,36 +42,27 @@ app.post('/send', async (req, res) => {
   const { message, character } = req.body;
 
   systemMessage = character.description;
-
   const prompt = message;
 
-  const messages = [
-    {
-      "role": "system",
-      "content": systemMessage,
-    },
-    {
-      "role": "user",
-      "content": prompt
-    }
-  ];
-
-  const openai = new OpenAI({
-    baseURL: "https://models.inference.ai.azure.com", // might need to change to this url in the future: https://models.github.ai/inference
-    apiKey: process.env.GITHUB_TOKEN,
-  });
-
   try {
+    console.log("SYSTEM MESSAGE: ", systemMessage);
     console.log(`SERVER sending prompt ${prompt}`)
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: messages,
+    
+    const session = await client.createSession({ 
+      model: "gpt-4.1", 
+      systemMessage: { 
+        mode: "replace",
+        content: systemMessage 
+      } 
     });
 
-    console.log(`SERVER: ${completion.choices[0]?.message?.content}`);
+    const response = await session.sendAndWait({ prompt: prompt });
+    const data = response?.data.content; 
+   
+    console.log(`SERVER: ${data}`);
     res.json({
       prompt: prompt,
-      answer: completion.choices[0]?.message?.content
+      answer: data
     });
   } catch (error) {
     console.error(`Error: ${error.message}`); // Log the error message for debugging
